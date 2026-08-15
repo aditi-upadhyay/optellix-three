@@ -2,18 +2,28 @@ import { Injectable, NgZone } from '@angular/core';
 import { SparkRenderer, SplatFileType, SplatMesh } from '@sparkjsdev/spark';
 import {
   ACESFilmicToneMapping,
-  Color,
+  Box3,
   DirectionalLight,
   Group,
   HemisphereLight,
+  Mesh,
+  PCFSoftShadowMap,
   PerspectiveCamera,
+  PlaneGeometry,
   Scene,
+  ShadowMaterial,
   SRGBColorSpace,
   Vector3,
   WebGLRenderer,
 } from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { centerAndNormalize, loadCadObject } from './cad-loader';
+import {
+  applySplatColorPass,
+  applySplatOccupancyPass,
+  fitShadowCameraToBox,
+  floorPlaneFromSplatBox,
+} from './splat-compositor';
 
 export interface CadTransform {
   x: number;
@@ -32,14 +42,22 @@ export class HybridSceneService {
   private spark: SparkRenderer | null = null;
   private splat: SplatMesh | null = null;
   private cadRoot: Group | null = null;
+  private floor: Mesh | null = null;
+  private keyLight: DirectionalLight | null = null;
   private frameId = 0;
   private resizeObserver: ResizeObserver | null = null;
+  private splatWanted = true;
+  private cadWanted = true;
+
+  compositingMode: 'occupancy+color' | 'mesh' = 'occupancy+color';
+  floorShadowsEnabled = false;
 
   constructor(private readonly zone: NgZone) {}
 
   init(canvas: HTMLCanvasElement): void {
     const scene = new Scene();
-    scene.background = new Color(0x07080b);
+    // Color backgrounds force-clear depth on every render(); keep it null so
+    // occupancy depth survives the CAD and splat-color sub-passes.
 
     const camera = new PerspectiveCamera(50, 1, 0.02, 250);
     camera.position.set(3.4, 1.7, 4.6);
@@ -52,16 +70,29 @@ export class HybridSceneService {
       powerPreference: 'high-performance',
     });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setClearColor(0x07080b, 1);
     renderer.outputColorSpace = SRGBColorSpace;
     renderer.toneMapping = ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.05;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = PCFSoftShadowMap;
+    renderer.autoClear = false;
 
-    const spark = new SparkRenderer({ renderer });
+    const spark = new SparkRenderer({
+      renderer,
+      depthTest: true,
+      depthWrite: false,
+      transparent: true,
+    });
     scene.add(spark);
 
     scene.add(new HemisphereLight(0xd7e4f2, 0x1c1814, 0.9));
     const key = new DirectionalLight(0xfff3e4, 1.45);
     key.position.set(5, 9, 4);
+    key.castShadow = true;
+    key.shadow.mapSize.set(2048, 2048);
+    key.shadow.bias = -0.0005;
+    key.shadow.normalBias = 0.02;
     scene.add(key);
 
     const controls = new OrbitControls(camera, canvas);
@@ -76,6 +107,7 @@ export class HybridSceneService {
     this.camera = camera;
     this.renderer = renderer;
     this.spark = spark;
+    this.keyLight = key;
     this.controls = controls;
 
     this.resize(canvas);
@@ -87,9 +119,7 @@ export class HybridSceneService {
       const tick = () => {
         this.frameId = requestAnimationFrame(tick);
         this.controls?.update();
-        if (this.renderer && this.scene && this.camera) {
-          this.renderer.render(this.scene, this.camera);
-        }
+        this.renderFrame();
       };
       tick();
     });
@@ -120,6 +150,8 @@ export class HybridSceneService {
     await splat.initialized;
     this.centerObjectAtOrigin(splat);
     this.splat = splat;
+    this.installFloorFromSplat(splat);
+    this.syncLayerVisibility();
   }
 
   async loadCad(url: string): Promise<Group> {
@@ -128,19 +160,19 @@ export class HybridSceneService {
     const root = centerAndNormalize(object);
     this.scene?.add(root);
     this.cadRoot = root;
+    this.syncLayerVisibility();
     return root;
   }
 
   setSplatVisible(visible: boolean): void {
-    if (this.splat) {
-      this.splat.visible = visible;
-    }
+    this.splatWanted = visible;
+    this.compositingMode = visible ? 'occupancy+color' : 'mesh';
+    this.syncLayerVisibility();
   }
 
   setCadVisible(visible: boolean): void {
-    if (this.cadRoot) {
-      this.cadRoot.visible = visible;
-    }
+    this.cadWanted = visible;
+    this.syncLayerVisibility();
   }
 
   setCadTransform(transform: CadTransform): void {
@@ -162,10 +194,106 @@ export class HybridSceneService {
     this.clearCad();
     this.spark?.dispose();
     this.spark = null;
+    this.keyLight = null;
     this.renderer?.dispose();
     this.renderer = null;
     this.scene = null;
     this.camera = null;
+  }
+
+  private renderFrame(): void {
+    const renderer = this.renderer;
+    const scene = this.scene;
+    const camera = this.camera;
+    const spark = this.spark;
+    if (!renderer || !scene || !camera) {
+      return;
+    }
+
+    const showSplat = this.splatWanted && !!this.splat && !!spark;
+    const showCad = this.cadWanted && (!!this.cadRoot || !!this.floor);
+
+    renderer.clear();
+
+    if (showSplat && spark) {
+      this.setMeshObjectsVisible(false);
+      spark.visible = true;
+      applySplatOccupancyPass(spark);
+      renderer.render(scene, camera);
+    }
+
+    if (showCad) {
+      if (spark) {
+        spark.visible = false;
+      }
+      this.setMeshObjectsVisible(true);
+      renderer.render(scene, camera);
+    }
+
+    if (showSplat && spark) {
+      this.setMeshObjectsVisible(false);
+      spark.visible = true;
+      applySplatColorPass(spark);
+      renderer.render(scene, camera);
+    }
+
+    this.syncLayerVisibility();
+  }
+
+  private setMeshObjectsVisible(visible: boolean): void {
+    if (this.cadRoot) {
+      this.cadRoot.visible = visible;
+    }
+    if (this.floor) {
+      this.floor.visible = visible;
+    }
+  }
+
+  private syncLayerVisibility(): void {
+    if (this.spark) {
+      this.spark.visible = this.splatWanted;
+    }
+    if (this.splat) {
+      this.splat.visible = this.splatWanted;
+    }
+    if (this.cadRoot) {
+      this.cadRoot.visible = this.cadWanted;
+    }
+    if (this.floor) {
+      this.floor.visible = this.cadWanted;
+    }
+  }
+
+  private installFloorFromSplat(splat: SplatMesh): void {
+    this.clearFloor();
+    splat.updateMatrixWorld(true);
+    const box = splat.getBoundingBox(true).applyMatrix4(splat.matrixWorld);
+    const spec = floorPlaneFromSplatBox(box);
+    this.floorShadowsEnabled = spec !== null;
+    if (spec && this.scene) {
+      const mesh = new Mesh(
+        new PlaneGeometry(spec.width, spec.depth),
+        new ShadowMaterial({ opacity: 0.35, color: 0x000000 })
+      );
+      mesh.name = 'splatFloor';
+      mesh.rotation.x = -Math.PI / 2;
+      mesh.position.y = spec.y;
+      mesh.receiveShadow = true;
+      this.scene.add(mesh);
+      this.floor = mesh;
+    }
+    this.fitKeyLightShadow(box);
+  }
+
+  private fitKeyLightShadow(box: Box3): void {
+    if (!this.keyLight) {
+      return;
+    }
+    fitShadowCameraToBox(
+      this.keyLight.shadow.camera,
+      box,
+      this.keyLight.position
+    );
   }
 
   private centerObjectAtOrigin(object: SplatMesh): void {
@@ -188,12 +316,28 @@ export class HybridSceneService {
   }
 
   private clearSplat(): void {
+    this.clearFloor();
     if (!this.splat) {
       return;
     }
     this.splat.removeFromParent();
     this.splat.dispose();
     this.splat = null;
+  }
+
+  private clearFloor(): void {
+    if (!this.floor) {
+      this.floorShadowsEnabled = false;
+      return;
+    }
+    this.floor.geometry.dispose();
+    const material = this.floor.material;
+    if (!Array.isArray(material)) {
+      material.dispose();
+    }
+    this.floor.removeFromParent();
+    this.floor = null;
+    this.floorShadowsEnabled = false;
   }
 
   private clearCad(): void {

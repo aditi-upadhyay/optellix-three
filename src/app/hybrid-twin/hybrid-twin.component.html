@@ -18,6 +18,8 @@
         <span class="hud__meter-bar" [style.width.%]="progress * 100"></span>
       </div>
       <p class="hud__meta" *ngIf="progress !== null">{{ progressLabel }}</p>
+      <p class="hud__meta">Depth: {{ compositingMode }}</p>
+      <p class="hud__meta">Floor shadows: {{ floorShadowsLabel }}</p>
       <p class="hud__error" *ngIf="error">{{ error }}</p>
     </section>
 

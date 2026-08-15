@@ -76,6 +76,14 @@ export class HybridTwinComponent implements AfterViewInit, OnDestroy {
     return `${Math.round(this.progress * 100)}%`;
   }
 
+  get compositingMode(): string {
+    return this.scene.compositingMode;
+  }
+
+  get floorShadowsLabel(): string {
+    return this.scene.floorShadowsEnabled ? 'on' : 'off';
+  }
+
   private async boot(): Promise<void> {
     const errors: string[] = [];
 
