@@ -1,2 +1,9 @@
 node_modules
 .angular
+dist
+src/assets/*.splat
+src/assets/*.spz
+src/assets/*.ksplat
+src/assets/*.ply
+src/assets/*.sog
+src/assets/*.rad

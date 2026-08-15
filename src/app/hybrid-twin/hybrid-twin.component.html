@@ -1,0 +1,119 @@
+<div class="stage">
+  <canvas #viewport class="stage__canvas"></canvas>
+
+  <div class="stage__frame" aria-hidden="true"></div>
+  <div class="stage__grain" aria-hidden="true"></div>
+
+  <aside class="hud">
+    <header class="hud__brand">
+      <p class="hud__kicker">Optellix Assignment</p>
+      <h1>Hybrid Twin</h1>
+      <p class="hud__tag">Gaussian environment + functional CAD</p>
+    </header>
+
+    <section class="hud__block">
+      <h2>Pipeline</h2>
+      <p class="hud__status">{{ status }}</p>
+      <div class="hud__meter" *ngIf="progress !== null">
+        <span class="hud__meter-bar" [style.width.%]="progress * 100"></span>
+      </div>
+      <p class="hud__meta" *ngIf="progress !== null">{{ progressLabel }}</p>
+      <p class="hud__error" *ngIf="error">{{ error }}</p>
+    </section>
+
+    <section class="hud__block">
+      <h2>Layers</h2>
+      <div class="hud__seg">
+        <button
+          type="button"
+          [class.is-active]="layerMode === 'both'"
+          (click)="setLayer('both')"
+        >
+          Both
+        </button>
+        <button
+          type="button"
+          [class.is-active]="layerMode === 'splat'"
+          (click)="setLayer('splat')"
+        >
+          Splat
+        </button>
+        <button
+          type="button"
+          [class.is-active]="layerMode === 'cad'"
+          (click)="setLayer('cad')"
+        >
+          CAD
+        </button>
+      </div>
+    </section>
+
+    <section class="hud__block">
+      <h2>CAD alignment</h2>
+      <label>
+        Offset X
+        <input
+          type="range"
+          min="-4"
+          max="4"
+          step="0.01"
+          [(ngModel)]="cadX"
+          (ngModelChange)="onCadTransform()"
+        />
+        <span>{{ cadX | number: '1.2-2' }}</span>
+      </label>
+      <label>
+        Offset Y
+        <input
+          type="range"
+          min="-4"
+          max="4"
+          step="0.01"
+          [(ngModel)]="cadY"
+          (ngModelChange)="onCadTransform()"
+        />
+        <span>{{ cadY | number: '1.2-2' }}</span>
+      </label>
+      <label>
+        Offset Z
+        <input
+          type="range"
+          min="-4"
+          max="4"
+          step="0.01"
+          [(ngModel)]="cadZ"
+          (ngModelChange)="onCadTransform()"
+        />
+        <span>{{ cadZ | number: '1.2-2' }}</span>
+      </label>
+      <label>
+        Yaw
+        <input
+          type="range"
+          min="-180"
+          max="180"
+          step="1"
+          [(ngModel)]="cadRotY"
+          (ngModelChange)="onCadTransform()"
+        />
+        <span>{{ cadRotY }}°</span>
+      </label>
+      <label>
+        Scale
+        <input
+          type="range"
+          min="0.05"
+          max="8"
+          step="0.01"
+          [(ngModel)]="cadScale"
+          (ngModelChange)="onCadTransform()"
+        />
+        <span>{{ cadScale | number: '1.2-2' }}×</span>
+      </label>
+    </section>
+
+    
+  </aside>
+
+  <p class="stage__hint" *ngIf="ready">Drag to orbit · scroll to dolly</p>
+</div>

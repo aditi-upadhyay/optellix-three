@@ -1,0 +1,241 @@
+:host {
+  display: block;
+  height: 100%;
+}
+
+.stage {
+  position: relative;
+  height: 100%;
+  background: #07080b;
+  overflow: hidden;
+}
+
+.stage__canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.stage__frame {
+  pointer-events: none;
+  position: absolute;
+  inset: 14px 14px 14px 318px;
+  border: 1px solid rgba(232, 176, 64, 0.22);
+  box-shadow:
+    inset 0 0 0 1px rgba(8, 10, 14, 0.55),
+    0 0 40px rgba(0, 0, 0, 0.35);
+}
+
+.stage__frame::before,
+.stage__frame::after {
+  content: '';
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  border: 2px solid #e8b040;
+}
+
+.stage__frame::before {
+  top: -1px;
+  left: -1px;
+  border-right: 0;
+  border-bottom: 0;
+}
+
+.stage__frame::after {
+  right: -1px;
+  bottom: -1px;
+  border-left: 0;
+  border-top: 0;
+}
+
+.stage__grain {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  opacity: 0.07;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.55'/%3E%3C/svg%3E");
+}
+
+.hud {
+  position: absolute;
+  top: 18px;
+  left: 18px;
+  bottom: 18px;
+  width: 22%;
+  padding: 22px 20px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  color: #d7dde4;
+  background:
+    linear-gradient(180deg, rgba(14, 16, 22, 0.92), rgba(10, 12, 16, 0.88));
+  border: 1px solid rgba(232, 176, 64, 0.18);
+  box-shadow: 8px 0 40px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(10px);
+}
+
+.hud__brand h1 {
+  margin: 2px 0 0;
+  font-family: Rajdhani, sans-serif;
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #f3efe6;
+}
+
+.hud__kicker,
+.hud__tag,
+.hud__status,
+.hud__meta,
+.hud__foot,
+.stage__hint,
+label {
+  font-family: 'IBM Plex Mono', monospace;
+}
+
+.hud__kicker {
+  margin: 0;
+  font-size: 0.68rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #e8b040;
+}
+
+.hud__tag,
+.hud__foot,
+.hud__meta {
+  margin: 6px 0 0;
+  font-size: 0.68rem;
+  line-height: 1.45;
+  color: #8b97a3;
+}
+
+.hud__block h2 {
+  margin: 0 0 10px;
+  font-family: Rajdhani, sans-serif;
+  font-size: 0.78rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: #9eb0bb;
+}
+
+.hud__status {
+  margin: 0;
+  font-size: 0.75rem;
+  color: #e7edf2;
+}
+
+.hud__meter {
+  margin-top: 10px;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.hud__meter-bar {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #e8b040, #7ee0c7);
+}
+
+.hud__error {
+  margin: 8px 0 0;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.68rem;
+  color: #ff6b5a;
+}
+
+.hud__seg {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+}
+
+.hud__seg button {
+  border: 1px solid rgba(232, 176, 64, 0.25);
+  background: transparent;
+  color: #c5ced6;
+  font-family: Rajdhani, sans-serif;
+  font-size: 0.85rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 7px 0;
+  cursor: pointer;
+}
+
+.hud__seg button.is-active {
+  background: #e8b040;
+  color: #16130e;
+  border-color: #e8b040;
+}
+
+label {
+  display: grid;
+  grid-template-columns: 72px 1fr 48px;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+  font-size: 0.64rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #9aa7b2;
+}
+
+label span {
+  text-align: right;
+  color: #e8b040;
+}
+
+input[type='range'] {
+  appearance: none;
+  height: 2px;
+  background: rgba(232, 176, 64, 0.35);
+  outline: none;
+}
+
+input[type='range']::-webkit-slider-thumb {
+  appearance: none;
+  width: 10px;
+  height: 10px;
+  background: #e8b040;
+  border-radius: 0;
+  cursor: pointer;
+}
+
+.hud__foot {
+  margin-top: auto;
+}
+
+.hud__foot code {
+  color: #7ee0c7;
+}
+
+.stage__hint {
+  position: absolute;
+  right: 28px;
+  bottom: 24px;
+  margin: 0;
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(215, 221, 228, 0.55);
+}
+
+@media (max-width: 820px) {
+  .hud {
+    top: auto;
+    right: 12px;
+    left: 12px;
+    bottom: 12px;
+    width: auto;
+    height: 42vh;
+    overflow: auto;
+  }
+
+  .stage__frame {
+    inset: 12px 12px calc(42vh + 20px);
+  }
+}

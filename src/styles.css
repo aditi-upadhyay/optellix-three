@@ -1,0 +1,21 @@
+html,
+body,
+app-root {
+  height: 100%;
+}
+
+html,
+body {
+  margin: 0;
+  overflow: hidden;
+  background: #07080b;
+  color: #d7dde4;
+}
+
+body {
+  font-family: 'IBM Plex Mono', monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
