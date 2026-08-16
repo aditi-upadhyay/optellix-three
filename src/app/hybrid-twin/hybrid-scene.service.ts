@@ -19,6 +19,12 @@ import {
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { centerAndNormalize, loadCadObject } from './cad-loader';
 import {
+  applyCadProximityToObject,
+  createProximityUniforms,
+  interiorDistanceToAabb,
+  proximityFromDistance,
+} from './cad-proximity';
+import {
   applySplatColorPass,
   applySplatOccupancyPass,
   fitShadowCameraToBox,
@@ -48,9 +54,13 @@ export class HybridSceneService {
   private resizeObserver: ResizeObserver | null = null;
   private splatWanted = true;
   private cadWanted = true;
+  private splatBox: Box3 | null = null;
+  private readonly cadWorldBox = new Box3();
+  private readonly proximityUniforms = createProximityUniforms();
 
   compositingMode: 'occupancy+color' | 'mesh' = 'occupancy+color';
   floorShadowsEnabled = false;
+  proximity = 0;
 
   constructor(private readonly zone: NgZone) {}
 
@@ -151,6 +161,7 @@ export class HybridSceneService {
     this.centerObjectAtOrigin(splat);
     this.splat = splat;
     this.installFloorFromSplat(splat);
+    this.updateCadProximity();
     this.syncLayerVisibility();
   }
 
@@ -158,8 +169,10 @@ export class HybridSceneService {
     this.clearCad();
     const object = await loadCadObject(url);
     const root = centerAndNormalize(object);
+    applyCadProximityToObject(root, this.proximityUniforms);
     this.scene?.add(root);
     this.cadRoot = root;
+    this.updateCadProximity();
     this.syncLayerVisibility();
     return root;
   }
@@ -182,6 +195,7 @@ export class HybridSceneService {
     this.cadRoot.position.set(transform.x, transform.y, transform.z);
     this.cadRoot.rotation.set(0, transform.rotY, 0);
     this.cadRoot.scale.setScalar(transform.scale);
+    this.updateCadProximity();
   }
 
   dispose(): void {
@@ -268,6 +282,7 @@ export class HybridSceneService {
     this.clearFloor();
     splat.updateMatrixWorld(true);
     const box = splat.getBoundingBox(true).applyMatrix4(splat.matrixWorld);
+    this.splatBox = box.clone();
     const spec = floorPlaneFromSplatBox(box);
     this.floorShadowsEnabled = spec !== null;
     if (spec && this.scene) {
@@ -315,14 +330,28 @@ export class HybridSceneService {
     this.renderer.setSize(width, height, false);
   }
 
-  private clearSplat(): void {
-    this.clearFloor();
-    if (!this.splat) {
+  private updateCadProximity(): void {
+    if (!this.cadRoot || !this.splatBox) {
+      this.proximity = 0;
+      this.proximityUniforms.uProximity.value = 0;
       return;
     }
-    this.splat.removeFromParent();
-    this.splat.dispose();
-    this.splat = null;
+    this.cadRoot.updateMatrixWorld(true);
+    this.cadWorldBox.setFromObject(this.cadRoot);
+    const distance = interiorDistanceToAabb(this.cadWorldBox, this.splatBox);
+    this.proximity = proximityFromDistance(distance);
+    this.proximityUniforms.uProximity.value = this.proximity;
+  }
+
+  private clearSplat(): void {
+    this.clearFloor();
+    this.splatBox = null;
+    if (this.splat) {
+      this.splat.removeFromParent();
+      this.splat.dispose();
+      this.splat = null;
+    }
+    this.updateCadProximity();
   }
 
   private clearFloor(): void {
@@ -346,5 +375,6 @@ export class HybridSceneService {
     }
     this.cadRoot.removeFromParent();
     this.cadRoot = null;
+    this.updateCadProximity();
   }
 }

@@ -14,6 +14,10 @@ import {
   resolveAssetUrl,
 } from './assets.config';
 import { HybridSceneService } from './hybrid-scene.service';
+import {
+  SceneCadState,
+  SceneStateSerializer,
+} from './scene-state-serializer';
 
 export type LayerMode = 'both' | 'splat' | 'cad';
 
@@ -38,6 +42,8 @@ export class HybridTwinComponent implements AfterViewInit, OnDestroy {
   cadZ = 0;
   cadRotY = 0;
   cadScale = 1;
+
+  private readonly serializer = new SceneStateSerializer();
 
   constructor(
     private readonly scene: HybridSceneService,
@@ -69,6 +75,29 @@ export class HybridTwinComponent implements AfterViewInit, OnDestroy {
     });
   }
 
+  savePose(): void {
+    this.serializer.save(this.toSceneState());
+  }
+
+  loadPose(): void {
+    const saved = this.serializer.load();
+    if (!saved) {
+      return;
+    }
+    this.applySceneState(saved);
+    this.onCadTransform();
+  }
+
+  resetPose(): void {
+    this.cadX = 0;
+    this.cadY = 0;
+    this.cadZ = 0;
+    this.cadRotY = 0;
+    this.cadScale = 1;
+    this.serializer.clear();
+    this.onCadTransform();
+  }
+
   get progressLabel(): string {
     if (this.progress == null) {
       return '';
@@ -82,6 +111,10 @@ export class HybridTwinComponent implements AfterViewInit, OnDestroy {
 
   get floorShadowsLabel(): string {
     return this.scene.floorShadowsEnabled ? 'on' : 'off';
+  }
+
+  get proximity(): number {
+    return this.scene.proximity;
   }
 
   private async boot(): Promise<void> {
@@ -114,6 +147,10 @@ export class HybridTwinComponent implements AfterViewInit, OnDestroy {
     try {
       this.setStatus('Loading mechanical CAD');
       await this.scene.loadCad(cadUrl);
+      const saved = this.serializer.load();
+      if (saved) {
+        this.applySceneState(saved);
+      }
       this.onCadTransform();
     } catch (err) {
       errors.push(`CAD: ${this.toMessage(err)}`);
@@ -137,5 +174,26 @@ export class HybridTwinComponent implements AfterViewInit, OnDestroy {
 
   private degToRad(degrees: number): number {
     return (degrees * Math.PI) / 180;
+  }
+
+  private radToDeg(radians: number): number {
+    return (radians * 180) / Math.PI;
+  }
+
+  private toSceneState(): SceneCadState {
+    return {
+      version: 1,
+      position: { x: this.cadX, y: this.cadY, z: this.cadZ },
+      rotation: { x: 0, y: this.degToRad(this.cadRotY), z: 0 },
+      scale: { x: this.cadScale, y: this.cadScale, z: this.cadScale },
+    };
+  }
+
+  private applySceneState(state: SceneCadState): void {
+    this.cadX = state.position.x;
+    this.cadY = state.position.y;
+    this.cadZ = state.position.z;
+    this.cadRotY = this.radToDeg(state.rotation.y);
+    this.cadScale = state.scale.x;
   }
 }

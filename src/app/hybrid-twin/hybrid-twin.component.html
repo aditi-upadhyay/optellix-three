@@ -112,6 +112,12 @@
         />
         <span>{{ cadScale | number: '1.2-2' }}×</span>
       </label>
+      <p class="hud__meta">Proximity: {{ proximity | percent: '1.0-0' }}</p>
+      <div class="hud__seg">
+        <button type="button" (click)="savePose()">Save pose</button>
+        <button type="button" (click)="loadPose()">Load pose</button>
+        <button type="button" (click)="resetPose()">Reset</button>
+      </div>
     </section>
 
     
